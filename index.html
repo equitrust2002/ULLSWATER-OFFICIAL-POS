@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ullswater Corporation - POS, Inventory & Ledger System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QRCode.js library for ticket QR codes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen p-3 md:p-6">
+
+  <!-- Login Overlay / Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 space-y-6 border border-slate-200">
+      <div class="text-center space-y-1">
+        <h2 class="text-2xl font-black text-slate-900 tracking-tight">ULLSWATER CORPORATION</h2>
+        <p class="text-xs text-slate-500 uppercase tracking-widest font-semibold">POS & Inventory System Login</p>
+      </div>
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Username</label>
+          <input type="text" id="loginUsername" required class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-600 outline-none" placeholder="Enter your username">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Password</label>
+          <input type="password" id="loginPassword" required class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-600 outline-none" placeholder="••••••••">
+        </div>
+        <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-lg transition">
+          Secure Login
+        </button>
+      </form>
+      <div class="text-[11px] text-slate-400 text-center bg-slate-50 p-3 rounded-xl border">
+        Default Admin Account: <strong class="text-slate-600">admin</strong> / Password: <strong class="text-slate-600">admin123</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">ULLSWATER CORPORATION</h1>
+        <p class="text-xs text-slate-500 uppercase tracking-wider font-semibold">POS, Inventory & Transaction Ledger</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div id="currentUserBadge" class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-semibold text-slate-700">
+          👤 <span id="badgeUsername">Admin</span> (<span id="badgeRole" class="text-blue-600">All Access</span>)
+        </div>
+        <button onclick="openUserManagementModal()" id="btnManageUsers" class="hidden px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition shadow-sm">
+          👥 Users & Permissions
+        </button>
+        <button onclick="openPrintConfigModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition shadow-sm">
+          🖨️ Print Settings
+        </button>
+        <button onclick="openNoteOptionsModal()" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition shadow-sm">
+          📝 Note Lists
+        </button>
+        <button onclick="openInventoryModal()" id="btnNavInventory" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition shadow-sm">
+          ⚙️ Inventory
+        </button>
+        <button onclick="logoutSession()" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition shadow-sm">
+          🔒 Logout
+        </button>
+      </div>
+    </header>
+
+    <!-- Main POS Interface: Menu Catalog + Live Order Ticket -->
+    <div id="sectionPOS" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Left 2 Cols: Clickable Menu Items -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-slate-800">Touch & Click Menu Catalog</h2>
+            <span class="text-xs text-slate-400">Click any item to add to order ticket</span>
+          </div>
+          <div id="posMenuGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto p-1"></div>
+        </div>
+      </div>
+
+      <!-- Right Col: Current Ticket / Cart Summary -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+        <div class="space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h2 class="text-lg font-semibold text-slate-800">Current Order Ticket</h2>
+            <button onclick="clearCurrentOrder()" class="text-xs text-rose-500 hover:text-rose-700 font-medium">Clear All</button>
+          </div>
+          
+          <div class="space-y-2">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Customer Name / Project</label>
+              <input type="text" id="orderCustomer" value="Walk-in Customer" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Transaction Date</label>
+                <input type="date" id="orderDate" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Transaction Type</label>
+                <select id="orderTxType" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm bg-slate-50 font-semibold text-emerald-600">
+                  <option value="Income">Income / Sale</option>
+                  <option value="Expense">Expense / Restock</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5 Separate Ticket Notes Dropdown/Input Rows on Entry Form -->
+          <div class="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+            <span class="block text-[11px] font-bold text-slate-700 uppercase">Ticket Notes (5 Rows):</span>
+            <div class="flex gap-1"><select id="mainSelect1" onchange="document.getElementById('mainNote1').value=this.value" class="w-1/3 px-1 py-1 border rounded text-[11px] bg-white"><option value="">--Preset--</option></select><input type="text" id="mainNote1" placeholder="Note Line 1" class="w-2/3 px-2 py-1 border rounded text-xs bg-white"></div>
+            <div class="flex gap-1"><select id="mainSelect2" onchange="document.getElementById('mainNote2').value=this.value" class="w-1/3 px-1 py-1 border rounded text-[11px] bg-white"><option value="">--Preset--</option></select><input type="text" id="mainNote2" placeholder="Note Line 2" class="w-2/3 px-2 py-1 border rounded text-xs bg-white"></div>
+            <div class="flex gap-1"><select id="mainSelect3" onchange="document.getElementById('mainNote3').value=this.value" class="w-1/3 px-1 py-1 border rounded text-[11px] bg-white"><option value="">--Preset--</option></select><input type="text" id="mainNote3" placeholder="Note Line 3" class="w-2/3 px-2 py-1 border rounded text-xs bg-white"></div>
+            <div class="flex gap-1"><select id="mainSelect4" onchange="document.getElementById('mainNote4').value=this.value" class="w-1/3 px-1 py-1 border rounded text-[11px] bg-white"><option value="">--Preset--</option></select><input type="text" id="mainNote4" placeholder="Note Line 4" class="w-2/3 px-2 py-1 border rounded text-xs bg-white"></div>
+            <div class="flex gap-1"><select id="mainSelect5" onchange="document.getElementById('mainNote5').value=this.value" class="w-1/3 px-1 py-1 border rounded text-[11px] bg-white"><option value="">--Preset--</option></select><input type="text" id="mainNote5" placeholder="Note Line 5" class="w-2/3 px-2 py-1 border rounded text-xs bg-white"></div>
+          </div>
+
+          <!-- Ticket Item List -->
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Selected Order Items</label>
+            <div id="ticketItemList" class="divide-y divide-slate-100 max-h-32 overflow-y-auto border border-slate-100 rounded-lg p-2 bg-slate-50/50">
+              <p class="text-xs text-slate-400 text-center py-2">No items selected yet. Click menu items on the left.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-slate-200 pt-3 space-y-3 mt-3">
+          <div class="flex justify-between items-center text-base font-bold text-slate-900">
+            <span>Total Amount:</span>
+            <span id="ticketTotalDisplay" class="text-emerald-600 text-xl">₱0.00</span>
+          </div>
+          <button onclick="openEditableReceiptModal()" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-md transition">
+            Review, Edit & Print Ticket
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Financial Totals Dashboard -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Sales (Income)</span>
+        <div class="text-2xl font-bold text-emerald-600 mt-1" id="totalIncomeDisplay">0.00</div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Expenses / Restock</span>
+        <div class="text-2xl font-bold text-rose-600 mt-1" id="totalExpenseDisplay">0.00</div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Net Balance</span>
+        <div class="text-2xl font-bold text-slate-800 mt-1" id="netBalanceDisplay">0.00</div>
+      </div>
+    </div>
+
+    <!-- Inventory Stock Table & CSV Controls -->
+    <div id="sectionInventory" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2">
+        <h2 class="text-lg font-semibold text-slate-800">Inventory Stock Levels & Management</h2>
+        <div class="flex gap-2">
+          <button onclick="exportInventoryCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-lg font-medium">📥 Export Inventory CSV</button>
+          <label class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg font-medium cursor-pointer">
+            📤 Import Inventory CSV <input type="file" id="invCsvInput" accept=".csv" onchange="importInventoryCSV(event)" class="hidden">
+          </label>
+          <button onclick="openInventoryModal()" class="px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg hover:bg-slate-900 font-medium">+ Add Item</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider">
+            <tr>
+              <th class="p-3">Image</th>
+              <th class="p-3">Item Name</th>
+              <th class="p-3">Category</th>
+              <th class="p-3 text-right">Price</th>
+              <th class="p-3 text-center">Stock Quantity</th>
+              <th class="p-3 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Ledger Transaction Log Table & CSV Controls -->
+    <div id="sectionLedger" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2">
+        <h2 class="text-lg font-semibold text-slate-800">Transaction Ledger Log (Editable & Printable)</h2>
+        <div class="flex gap-2">
+          <button onclick="exportLedgerCSV()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-lg font-medium">📥 Export Ledger CSV</button>
+          <label class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded-lg font-medium cursor-pointer">
+            📤 Import Ledger CSV <input type="file" id="ledgerCsvInput" accept=".csv" onchange="importLedgerCSV(event)" class="hidden">
+          </label>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-slate-600">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider">
+            <tr>
+              <th class="p-3">Date</th>
+              <th class="p-3">Ref ID</th>
+              <th class="p-3">Description / Items</th>
+              <th class="p-3">Customer / Payee</th>
+              <th class="p-3">User Stamp</th>
+              <th class="p-3 text-center">Type</th>
+              <th class="p-3 text-right">Amount</th>
+              <th class="p-3 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users & Permissions Management Modal -->
+  <div id="userManagementModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4 border border-slate-200 relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeUserManagementModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      <h3 class="text-lg font-bold text-slate-900">👥 Manage Users & Permission Scopes</h3>
+      
+      <form onsubmit="saveNewUser(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <h4 class="text-xs font-bold text-slate-700 uppercase">Add New User</h4>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Username</label>
+            <input type="text" id="newUsername" required class="w-full px-3 py-1.5 border rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Password</label>
+            <input type="password" id="newUserPassword" required class="w-full px-3 py-1.5 border rounded-lg text-sm">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Permission Scope / Role</label>
+          <select id="newUserScope" class="w-full px-3 py-1.5 border rounded-lg text-sm bg-white font-medium">
+            <option value="All">All Access (Admin)</option>
+            <option value="POS">POS / Sales Only</option>
+            <option value="Inventory">Inventory Management Only</option>
+            <option value="Ledger">Ledger & Financial Reports Only</option>
+          </select>
+        </div>
+        <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition">Create User Account</button>
+      </form>
+
+      <div class="space-y-2">
+        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Existing System Users</h4>
+        <div id="usersListContainer" class="space-y-2 max-h-48 overflow-y-auto"></div>
+      </div>
+
+      <button onclick="closeUserManagementModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition">Close</button>
+    </div>
+  </div>
+
+  <!-- Note Options Manager Modal -->
+  <div id="noteOptionsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4 border border-slate-200 relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeNoteOptionsModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      <h3 class="text-lg font-bold text-slate-900">📝 Manage Note List Presets</h3>
+      <div class="flex gap-2">
+        <input type="text" id="newNotePresetInput" placeholder="Add new preset option..." class="flex-1 px-3 py-1.5 border rounded-lg text-xs">
+        <button onclick="addNotePreset()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold">Add Preset</button>
+      </div>
+      <div class="space-y-1">
+        <label class="block text-xs font-bold text-slate-600 uppercase">Existing Presets:</label>
+        <div id="notePresetsListContainer" class="space-y-1.5 max-h-60 overflow-y-auto border p-2 rounded bg-slate-50"></div>
+      </div>
+      <button onclick="closeNoteOptionsModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition">Close & Save</button>
+    </div>
+  </div>
+
+  <!-- Print Configuration Modal -->
+  <div id="printConfigModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 space-y-4 border border-slate-200 relative">
+      <button onclick="closePrintConfigModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      <h3 class="text-lg font-bold text-slate-900">🖨️ Print Configuration</h3>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Number of Receipt Copies per Print:</label>
+          <input type="number" id="printCopiesInput" min="1" max="10" value="1" class="w-full px-3 py-2 border rounded-lg text-sm font-bold text-slate-800">
+        </div>
+        <div>
+          <label class="block font-medium text-slate-600 mb-1">Receipt Header Title:</label>
+          <input type="text" id="printHeaderTitle" value="ULLSWATER CORPORATION" class="w-full px-3 py-2 border rounded-lg text-sm">
+        </div>
+      </div>
+      <button onclick="savePrintConfig()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow">Save Settings</button>
+    </div>
+  </div>
+
+  <!-- Inventory / Menu Manager Modal -->
+  <div id="inventoryModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-xl w-full p-6 space-y-4 border border-slate-200 relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeInventoryModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      <h3 id="invModalTitle" class="text-lg font-bold text-slate-900">Add or Reconfigure Inventory Item</h3>
+      
+      <form id="inventoryItemForm" onsubmit="saveInventoryItem(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <input type="hidden" id="invEditId" value="">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Item Name</label>
+            <input type="text" id="invName" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Category</label>
+            <input type="text" id="invCategory" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm" placeholder="e.g., Equipment, Parts">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Price (₱)</label>
+            <input type="number" step="0.01" id="invPrice" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-600 mb-1">Stock Quantity</label>
+            <input type="number" id="invStock" required class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">Upload Photo</label>
+          <input type="file" id="invImageFile" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <input type="hidden" id="invExistingImage">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-xs transition">Save to Inventory Catalog</button>
+          <button type="button" onclick="resetInventoryForm()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold">Clear</button>
+        </div>
+      </form>
+
+      <div class="space-y-2">
+        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Existing Catalog Stock List</h4>
+        <div id="inventoryManagerList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+      </div>
+
+      <button onclick="closeInventoryModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition">Close</button>
+    </div>
+  </div>
+
+  <!-- Fully Editable & Printable Ticket Modal -->
+  <div id="receiptModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-3 text-slate-800 relative max-h-[90vh] overflow-y-auto font-mono text-xs">
+      <button onclick="closeReceiptModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      
+      <div class="text-center border-b border-dashed border-slate-300 pb-2 space-y-0.5">
+        <h3 id="receiptModalHeaderTitle" class="font-bold text-sm tracking-wider">ULLSWATER CORPORATION</h3>
+        <p class="text-[10px] text-slate-500 uppercase tracking-widest">Official Receipt / Ticket</p>
+        <p id="receiptDateTime" class="text-[10px] text-slate-500"></p>
+        <p class="text-[10px] font-bold text-blue-600">Served by: <span id="receiptUserStamp">Admin</span></p>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <span class="block text-[9px] text-slate-400 uppercase">Ref ID:</span>
+          <input type="text" id="editReceiptTxId" class="w-full px-1.5 py-0.5 border rounded bg-slate-50 font-mono text-[10px]" readonly>
+        </div>
+        <div>
+          <span class="block text-[9px] text-slate-400 uppercase">Customer:</span>
+          <input type="text" id="editReceiptCustomer" class="w-full px-1.5 py-0.5 border rounded text-[10px]">
+        </div>
+        <div>
+          <span class="block text-[9px] text-slate-400 uppercase">Type:</span>
+          <select id="editReceiptType" class="w-full px-1.5 py-0.5 border rounded text-[10px] font-semibold">
+            <option value="Income">Income</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 5 Separate Ticket Notes Dropdown/Input Rows in Modal -->
+      <div class="space-y-1 bg-slate-50 p-2 rounded border border-slate-200">
+        <span class="block text-[10px] font-bold text-slate-600 uppercase">Ticket Notes (5 Rows):</span>
+        <div class="flex gap-1"><select id="modalSelect1" onchange="document.getElementById('ticketNote1').value=this.value" class="w-1/3 px-1 py-0.5 border rounded text-[10px] bg-white"><option value="">--Preset--</option></select><input type="text" id="ticketNote1" placeholder="Note Line 1" class="w-2/3 px-2 py-0.5 border rounded text-[11px] bg-white"></div>
+        <div class="flex gap-1"><select id="modalSelect2" onchange="document.getElementById('ticketNote2').value=this.value" class="w-1/3 px-1 py-0.5 border rounded text-[10px] bg-white"><option value="">--Preset--</option></select><input type="text" id="ticketNote2" placeholder="Note Line 2" class="w-2/3 px-2 py-0.5 border rounded text-[11px] bg-white"></div>
+        <div class="flex gap-1"><select id="modalSelect3" onchange="document.getElementById('ticketNote3').value=this.value" class="w-1/3 px-1 py-0.5 border rounded text-[10px] bg-white"><option value="">--Preset--</option></select><input type="text" id="ticketNote3" placeholder="Note Line 3" class="w-2/3 px-2 py-0.5 border rounded text-[11px] bg-white"></div>
+        <div class="flex gap-1"><select id="modalSelect4" onchange="document.getElementById('ticketNote4').value=this.value" class="w-1/3 px-1 py-0.5 border rounded text-[10px] bg-white"><option value="">--Preset--</option></select><input type="text" id="ticketNote4" placeholder="Note Line 4" class="w-2/3 px-2 py-0.5 border rounded text-[11px] bg-white"></div>
+        <div class="flex gap-1"><select id="modalSelect5" onchange="document.getElementById('ticketNote5').value=this.value" class="w-1/3 px-1 py-0.5 border rounded text-[10px] bg-white"><option value="">--Preset--</option></select><input type="text" id="ticketNote5" placeholder="Note Line 5" class="w-2/3 px-2 py-0.5 border rounded text-[11px] bg-white"></div>
+      </div>
+
+      <div class="border-t border-b border-dashed border-slate-300 py-2 space-y-2">
+        <div class="flex justify-between font-bold text-[10px] text-slate-500 uppercase">
+          <span>Item</span>
+          <span>Qty / Amt</span>
+          <span>Action</span>
+        </div>
+        <div id="editableReceiptItemsList" class="space-y-1.5 max-h-32 overflow-y-auto"></div>
+
+        <div class="pt-1 flex gap-1">
+          <select id="modalAddItemSelect" class="flex-1 px-2 py-1 border rounded text-xs"></select>
+          <button onclick="addItemToEditableReceipt()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold">+ Add</button>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center font-bold text-sm pt-1 border-t border-dashed border-slate-200">
+        <span>TOTAL:</span>
+        <span id="editableReceiptTotalAmount" class="text-emerald-600 text-base">₱0.00</span>
+      </div>
+
+      <div class="pt-1 flex flex-col items-center justify-center space-y-1">
+        <div id="qrcode" class="p-1 bg-white border border-slate-200 rounded"></div>
+        <p class="text-[9px] text-slate-400 text-center">Thank you for your business with Ullswater Corporation!</p>
+      </div>
+      
+      <div class="flex gap-2 pt-2 border-t border-slate-100">
+        <button onclick="confirmAndPrintOrder()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs shadow">Save, Update Stock & Print</button>
+        <button onclick="closeReceiptModal()" class="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let users = JSON.parse(localStorage.getItem('ullswater_users')) || [
+      { username: 'admin', password: 'admin123', scope: 'All' }
+    ];
+    let currentUser = JSON.parse(localStorage.getItem('ullswater_current_user')) || null;
+
+    let menuItems = JSON.parse(localStorage.getItem('ullswater_menu_items')) || [
+      { id: 'M-101', name: 'Volvo EC210D Hydraulic Filter', category: 'Parts', price: 3500.00, stock: 15, image: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150' },
+      { id: 'M-102', name: 'Howo Dump Truck Tire 12.00R20', category: 'Tires', price: 18500.00, stock: 8, image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=150' },
+      { id: 'M-103', name: 'Heavy Equipment Diesel (Liters)', category: 'Fuel', price: 65.00, stock: 5000, image: 'https://images.unsplash.com/photo-1527018270360-705a7cf10978?w=150' },
+      { id: 'M-104', name: 'Bucket Teeth 30GPE', category: 'Parts', price: 1250.00, stock: 40, image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=150' }
+    ];
+    let ledger = JSON.parse(localStorage.getItem('ullswater_ledger')) || [];
+    let printConfig = JSON.parse(localStorage.getItem('ullswater_print_config')) || { copies: 1, title: 'ULLSWATER CORPORATION' };
+    let notePresets = JSON.parse(localStorage.getItem('ullswater_note_presets')) || [
+      'Cash on Delivery', 'Paid via Bank Transfer', 'Dispatch Approved', 'Job Order #101', 'Heavy Hauling Unit', 'Priority Delivery'
+    ];
+
+    let currentOrder = [];
+    let activeEditingOrder = []; 
+    let editingLedgerTxId = null; 
+
+    document.getElementById('orderDate').valueAsDate = new Date();
+    checkAuthSession();
+
+    function checkAuthSession() {
+      const loginModal = document.getElementById('loginModal');
+      if (!currentUser) {
+        loginModal.classList.remove('hidden');
+      } else {
+        loginModal.classList.add('hidden');
+        applyUserPermissions();
+        initApp();
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('loginUsername').value.trim();
+      const p = document.getElementById('loginPassword').value.trim();
+
+      const found = users.find(usr => usr.username === u && usr.password === p);
+      if (found) {
+        currentUser = found;
+        localStorage.setItem('ullswater_current_user', JSON.stringify(currentUser));
+        document.getElementById('loginUsername').value = '';
+        document.getElementById('loginPassword').value = '';
+        checkAuthSession();
+      } else {
+        alert('Invalid username or password!');
+      }
+    }
+
+    function logoutSession() {
+      currentUser = null;
+      localStorage.removeItem('ullswater_current_user');
+      checkAuthSession();
+    }
+
+    function applyUserPermissions() {
+      document.getElementById('badgeUsername').innerText = currentUser.username;
+      document.getElementById('badgeRole').innerText = currentUser.scope === 'All' ? 'Admin (All Access)' : currentUser.scope + ' Scope';
+
+      const btnManageUsers = document.getElementById('btnManageUsers');
+      const sectionPOS = document.getElementById('sectionPOS');
+      const sectionInventory = document.getElementById('sectionInventory');
+      const sectionLedger = document.getElementById('sectionLedger');
+      const btnNavInv = document.getElementById('btnNavInventory');
+
+      if (currentUser.scope === 'All') {
+        btnManageUsers.classList.remove('hidden');
+        sectionPOS.style.display = 'grid';
+        sectionInventory.style.display = 'block';
+        sectionLedger.style.display = 'block';
+        btnNavInv.style.display = 'inline-block';
+      } else if (currentUser.scope === 'POS') {
+        btnManageUsers.classList.add('hidden');
+        sectionPOS.style.display = 'grid';
+        sectionInventory.style.display = 'none';
+        sectionLedger.style.display = 'none';
+        btnNavInv.style.display = 'none';
+      } else if (currentUser.scope === 'Inventory') {
+        btnManageUsers.classList.add('hidden');
+        sectionPOS.style.display = 'none';
+        sectionInventory.style.display = 'block';
+        sectionLedger.style.display = 'none';
+        btnNavInv.style.display = 'inline-block';
+      } else if (currentUser.scope === 'Ledger') {
+        btnManageUsers.classList.add('hidden');
+        sectionPOS.style.display = 'none';
+        sectionInventory.style.display = 'none';
+        sectionLedger.style.display = 'block';
+        btnNavInv.style.display = 'none';
+      }
+    }
+
+    function openUserManagementModal() {
+      renderUsersList();
+      document.getElementById('userManagementModal').classList.remove('hidden');
+    }
+    function closeUserManagementModal() {
+      document.getElementById('userManagementModal').classList.add('hidden');
+    }
+
+    function renderUsersList() {
+      const container = document.getElementById('usersListContainer');
+      container.innerHTML = users.map((u, idx) => `
+        <div class="flex items-center justify-between bg-white p-2.5 rounded border border-slate-200 text-xs">
+          <div>
+            <span class="font-bold text-slate-800">${u.username}</span>
+            <span class="text-blue-600 block font-semibold">Scope: ${u.scope}</span>
+          </div>
+          <div>
+            ${u.username !== 'admin' ? `<button onclick="deleteUser(${idx})" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded font-bold">Delete</button>` : '<span class="text-slate-400 italic">Protected</span>'}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveNewUser(e) {
+      e.preventDefault();
+      const username = document.getElementById('newUsername').value.trim();
+      const password = document.getElementById('newUserPassword').value.trim();
+      const scope = document.getElementById('newUserScope').value;
+
+      if (users.some(u => u.username === username)) {
+        alert('Username already exists!');
+        return;
+      }
+
+      users.push({ username, password, scope });
+      localStorage.setItem('ullswater_users', JSON.stringify(users));
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newUserPassword').value = '';
+      renderUsersList();
+      alert('New user account created successfully!');
+    }
+
+    function deleteUser(idx) {
+      if (confirm('Are you sure you want to delete this user?')) {
+        users.splice(idx, 1);
+        localStorage.setItem('ullswater_users', JSON.stringify(users));
+        renderUsersList();
+      }
+    }
+
+    function initApp() {
+      renderPOSMenu();
+      renderInventoryTable();
+      renderLedger();
+      renderTicketCart();
+      populateNoteDropdowns();
+      document.getElementById('printCopiesInput').value = printConfig.copies;
+      document.getElementById('printHeaderTitle').value = printConfig.title;
+    }
+
+    function populateNoteDropdowns() {
+      const optionsHtml = '<option value="">--Preset--</option>' + notePresets.map(p => `<option value="${p}">${p}</option>`).join('');
+      for (let i = 1; i <= 5; i++) {
+        const mainSel = document.getElementById(`mainSelect${i}`);
+        const modSel = document.getElementById(`modalSelect${i}`);
+        if (mainSel) mainSel.innerHTML = optionsHtml;
+        if (modSel) modSel.innerHTML = optionsHtml;
+      }
+    }
+
+    function openNoteOptionsModal() {
+      renderNotePresetsList();
+      document.getElementById('noteOptionsModal').classList.remove('hidden');
+    }
+    function closeNoteOptionsModal() {
+      document.getElementById('noteOptionsModal').classList.add('hidden');
+      populateNoteDropdowns();
+    }
+    function renderNotePresetsList() {
+      const container = document.getElementById('notePresetsListContainer');
+      container.innerHTML = notePresets.map((preset, idx) => `
+        <div class="flex items-center justify-between bg-white p-1.5 rounded border text-xs">
+          <span class="font-medium text-slate-800">${preset}</span>
+          <button onclick="deleteNotePreset(${idx})" class="text-rose-500 hover:text-rose-700 font-bold px-1.5">&times;</button>
+        </div>
+      `).join('');
+    }
+    function addNotePreset() {
+      const val = document.getElementById('newNotePresetInput').value.trim();
+      if (!val) return;
+      notePresets.push(val);
+      localStorage.setItem('ullswater_note_presets', JSON.stringify(notePresets));
+      document.getElementById('newNotePresetInput').value = '';
+      renderNotePresetsList();
+    }
+    function deleteNotePreset(idx) {
+      notePresets.splice(idx, 1);
+      localStorage.setItem('ullswater_note_presets', JSON.stringify(notePresets));
+      renderNotePresetsList();
+    }
+
+    function openPrintConfigModal() {
+      document.getElementById('printConfigModal').classList.remove('hidden');
+    }
+    function closePrintConfigModal() {
+      document.getElementById('printConfigModal').classList.add('hidden');
+    }
+    function savePrintConfig() {
+      printConfig.copies = parseInt(document.getElementById('printCopiesInput').value) || 1;
+      printConfig.title = document.getElementById('printHeaderTitle').value || 'ULLSWATER CORPORATION';
+      localStorage.setItem('ullswater_print_config', JSON.stringify(printConfig));
+      closePrintConfigModal();
+      alert('Print configurations updated successfully!');
+    }
+
+    function renderPOSMenu() {
+      const grid = document.getElementById('posMenuGrid');
+      grid.innerHTML = menuItems.map(item => `
+        <div onclick="addToOrder('${item.id}')" class="bg-white border border-slate-200 hover:border-blue-500 rounded-xl p-3 flex flex-col justify-between cursor-pointer transition shadow-sm hover:shadow group">
+          <div>
+            <img src="${item.image || 'https://via.placeholder.com/150'}" class="w-full h-28 object-cover rounded-lg mb-2 group-hover:scale-105 transition">
+            <h4 class="text-xs font-bold text-slate-800 line-clamp-1">${item.name}</h4>
+            <span class="text-[10px] text-slate-400">Stock: ${item.stock}</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-600">₱${item.price.toFixed(2)}</span>
+            <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-semibold">+ Add</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addToOrder(id) {
+      const item = menuItems.find(i => i.id === id);
+      if (!item) return;
+
+      const txType = document.getElementById('orderTxType').value;
+      if (txType === 'Income' && item.stock <= 0) {
+        alert(`${item.name} is out of stock!`);
+        return;
+      }
+
+      const existing = currentOrder.find(i => i.id === id);
+      if (existing) {
+        if (txType === 'Income' && existing.qty >= item.stock) {
+          alert(`Cannot add more. Only ${item.stock} units available.`);
+          return;
+        }
+        existing.qty += 1;
+      } else {
+        currentOrder.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+      }
+      renderTicketCart();
+    }
+
+    function updateCartQty(id, change) {
+      const cartItem = currentOrder.find(i => i.id === id);
+      const item = menuItems.find(i => i.id === id);
+      const txType = document.getElementById('orderTxType').value;
+      if (!cartItem) return;
+
+      cartItem.qty += change;
+      if (txType === 'Income' && item && cartItem.qty > item.stock) {
+        cartItem.qty = item.stock;
+        alert(`Maximum available stock reached (${item.stock}).`);
+      }
+      if (cartItem.qty <= 0) {
+        currentOrder = currentOrder.filter(i => i.id !== id);
+      }
+      renderTicketCart();
+    }
+
+    function removeFromCart(id) {
+      currentOrder = currentOrder.filter(i => i.id !== id);
+      renderTicketCart();
+    }
+
+    function clearCurrentOrder() {
+      currentOrder = [];
+      for (let i = 1; i <= 5; i++) {
+        document.getElementById(`mainNote${i}`).value = '';
+        document.getElementById(`mainSelect${i}`).value = '';
+      }
+      renderTicketCart();
+    }
+
+    function renderTicketCart() {
+      const container = document.getElementById('ticketItemList');
+      if (currentOrder.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">No items selected yet. Click menu items on the left.</p>`;
+        document.getElementById('ticketTotalDisplay').innerText = '₱0.00';
+        return;
+      }
+
+      let total = 0;
+      container.innerHTML = currentOrder.map(item => {
+        let subtotal = item.price * item.qty;
+        total += subtotal;
+        return `
+          <div class="py-1.5 flex items-center justify-between text-xs">
+            <div class="flex-1">
+              <p class="font-semibold text-slate-800">${item.name}</p>
+              <p class="text-[10px] text-slate-500">₱${item.price.toFixed(2)} x ${item.qty}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="font-bold text-slate-700">₱${subtotal.toFixed(2)}</span>
+              <div class="flex items-center border rounded bg-white">
+                <button onclick="updateCartQty('${item.id}', -1)" class="px-1.5 py-0.5 hover:bg-slate-200 font-bold">-</button>
+                <span class="px-1">${item.qty}</span>
+                <button onclick="updateCartQty('${item.id}', 1)" class="px-1.5 py-0.5 hover:bg-slate-200 font-bold">+</button>
+              </div>
+              <button onclick="removeFromCart('${item.id}')" class="text-rose-500 hover:text-rose-700 font-bold px-1">&times;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('ticketTotalDisplay').innerText = '₱' + total.toLocaleString('en-US', {minimumFractionDigits: 2});
+    }
+
+    function openInventoryModal() {
+      renderInventoryManagerList();
+      document.getElementById('inventoryModal').classList.remove('hidden');
+    }
+    function closeInventoryModal() {
+      document.getElementById('inventoryModal').classList.add('hidden');
+      resetInventoryForm();
+    }
+    function resetInventoryForm() {
+      document.getElementById('inventoryItemForm').reset();
+      document.getElementById('invEditId').value = '';
+      document.getElementById('invExistingImage').value = '';
+      document.getElementById('invModalTitle').innerText = 'Add or Reconfigure Inventory Item';
+    }
+
+    function renderInventoryManagerList() {
+      const container = document.getElementById('inventoryManagerList');
+      container.innerHTML = menuItems.map((item, idx) => `
+        <div class="flex items-center justify-between bg-white p-2.5 rounded border border-slate-200 text-xs">
+          <div class="flex items-center gap-2">
+            <img src="${item.image || 'https://via.placeholder.com/150'}" class="w-9 h-9 object-cover rounded">
+            <div>
+              <span class="font-bold text-slate-800">${item.name} (${item.category})</span>
+              <span class="text-slate-500 block">₱${item.price.toFixed(2)} | Stock: <strong class="text-slate-700">${item.stock}</strong></span>
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editInventoryItem(${idx})" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded font-bold">Edit</button>
+            <button onclick="deleteInventoryItem(${idx})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded font-bold">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function saveInventoryItem(e) {
+      e.preventDefault();
+      const editId = document.getElementById('invEditId').value;
+      const name = document.getElementById('invName').value;
+      const category = document.getElementById('invCategory').value;
+      const price = parseFloat(document.getElementById('invPrice').value) || 0;
+      const stock = parseInt(document.getElementById('invStock').value) || 0;
+      const fileInput = document.getElementById('invImageFile');
+      const existingImg = document.getElementById('invExistingImage').value;
+
+      let fallbackImage = existingImg || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150';
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          commitItemSave(editId, name, category, price, stock, evt.target.result);
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        commitItemSave(editId, name, category, price, stock, fallbackImage);
+      }
+    }
+
+    function commitItemSave(editId, name, category, price, stock, image) {
+      if (!editId) {
+        menuItems.push({ id: 'M-' + Date.now().toString().slice(-4), name, category, price, stock, image });
+      } else {
+        const item = menuItems.find(i => i.id === editId);
+        if (item) {
+          item.name = name;
+          item.category = category;
+          item.price = price;
+          item.stock = stock;
+          item.image = image;
+        }
+      }
+
+      saveAndRefresh();
+      renderInventoryManagerList();
+      resetInventoryForm();
+      alert('Inventory catalog successfully updated!');
+    }
+
+    function editInventoryItem(index) {
+      const item = menuItems[index];
+      document.getElementById('invEditId').value = item.id;
+      document.getElementById('invName').value = item.name;
+      document.getElementById('invCategory').value = item.category;
+      document.getElementById('invPrice').value = item.price;
+      document.getElementById('invStock').value = item.stock;
+      document.getElementById('invExistingImage').value = item.image;
+      document.getElementById('invModalTitle').innerText = `Editing: ${item.name}`;
+    }
+
+    function deleteInventoryItem(index) {
+      if (confirm('Are you sure you want to delete this inventory item?')) {
+        menuItems.splice(index, 1);
+        saveAndRefresh();
+        renderInventoryManagerList();
+      }
+    }
+
+    function exportInventoryCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,ID,Name,Category,Price,Stock,Image\n";
+      menuItems.forEach(item => {
+        let safeImg = (item.image || '').replace(/"/g, '""');
+        csvContent += `"${item.id}","${item.name}","${item.category}",${item.price},${item.stock},"${safeImg}"\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "inventory_catalog.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function importInventoryCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const lines = evt.target.result.split('\n');
+        let newItems = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+          if (cols.length >= 5) {
+            newItems.push({
+              id: cols[0].replace(/"/g, '') || ('M-' + Date.now().toString().slice(-4)),
+              name: cols[1].replace(/"/g, ''),
+              category: cols[2].replace(/"/g, ''),
+              price: parseFloat(cols[3]) || 0,
+              stock: parseInt(cols[4]) || 0,
+              image: cols[5] ? cols[5].replace(/"/g, '') : 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150'
+            });
+          }
+        }
+        if (newItems.length > 0) {
+          menuItems = newItems;
+          saveAndRefresh();
+          alert('Inventory CSV Imported & Updated successfully!');
+        } else {
+          alert('Invalid CSV format.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportLedgerCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,ID,Date,Description,Payee,UserStamp,Type,Amount,Note1,Note2,Note3,Note4,Note5\n";
+      ledger.forEach(row => {
+        let n = row.notes || ['', '', '', '', ''];
+        csvContent += `"${row.id}","${row.date}","${row.desc}","${row.payee}","${row.userStamp || 'Admin'}","${row.type}",${row.amount},"${(n[0]||'').replace(/"/g,'""')}","${(n[1]||'').replace(/"/g,'""')}","${(n[2]||'').replace(/"/g,'""')}","${(n[3]||'').replace(/"/g,'""')}","${(n[4]||'').replace(/"/g,'""')}"\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "transaction_ledger.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function importLedgerCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const lines = evt.target.result.split('\n');
+        let newLedger = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+          if (cols.length >= 6) {
+            newLedger.push({
+              id: cols[0].replace(/"/g, ''),
+              date: cols[1].replace(/"/g, ''),
+              desc: cols[2].replace(/"/g, ''),
+              payee: cols[3].replace(/"/g, ''),
+              userStamp: cols[4] ? cols[4].replace(/"/g, '') : 'Admin',
+              type: cols[5].replace(/"/g, ''),
+              amount: parseFloat(cols[6]) || 0,
+              notes: [
+                cols[7] ? cols[7].replace(/"/g, '') : '',
+                cols[8] ? cols[8].replace(/"/g, '') : '',
+                cols[9] ? cols[9].replace(/"/g, '') : '',
+                cols[10] ? cols[10].replace(/"/g, '') : '',
+                cols[11] ? cols[11].replace(/"/g, '') : ''
+              ],
+              items: []
+            });
+          }
+        }
+        if (newLedger.length > 0) {
+          ledger = newLedger;
+          saveAndRefresh();
+          alert('Ledger CSV Imported & Updated successfully!');
+        } else {
+          alert('Invalid Ledger CSV format.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function openEditableReceiptModal(existingTx = null) {
+      if (!existingTx && currentOrder.length === 0) {
+        alert('Please select items before proceeding to ticket review.');
+        return;
+      }
+
+      document.getElementById('receiptModalHeaderTitle').innerText = printConfig.title;
+      document.getElementById('receiptUserStamp').innerText = existingTx ? (existingTx.userStamp || 'Admin') : currentUser.username;
+      populateNoteDropdowns();
+
+      if (existingTx) {
+        editingLedgerTxId = existingTx.id;
+        activeEditingOrder = JSON.parse(JSON.stringify(existingTx.items || []));
+        document.getElementById('editReceiptTxId').value = existingTx.id;
+        document.getElementById('editReceiptCustomer').value = existingTx.payee;
+        document.getElementById('editReceiptType').value = existingTx.type;
+        
+        let n = existingTx.notes || ['', '', '', '', ''];
+        for(let i=1; i<=5; i++) {
+          document.getElementById(`ticketNote${i}`).value = n[i-1] || '';
+          document.getElementById(`modalSelect${i}`).value = '';
+        }
+        document.getElementById('receiptDateTime').innerText = existingTx.date;
+      } else {
+        editingLedgerTxId = null;
+        activeEditingOrder = JSON.parse(JSON.stringify(currentOrder));
+        document.getElementById('editReceiptTxId').value = 'TXN-' + Date.now().toString().slice(-6);
+        document.getElementById('editReceiptCustomer').value = document.getElementById('orderCustomer').value || 'Walk-in Customer';
+        document.getElementById('editReceiptType').value = document.getElementById('orderTxType').value;
+        
+        for(let i=1; i<=5; i++) {
+          document.getElementById(`ticketNote${i}`).value = document.getElementById(`mainNote${i}`).value;
+          document.getElementById(`modalSelect${i}`).value = '';
+        }
+        document.getElementById('receiptDateTime').innerText = new Date().toLocaleString();
+      }
+
+      const select = document.getElementById('modalAddItemSelect');
+      select.innerHTML = menuItems.map(i => `<option value="${i.id}">${i.name} (₱${i.price.toFixed(2)})</option>`).join('');
+
+      renderEditableReceiptItems();
+      document.getElementById('receiptModal').classList.remove('hidden');
+    }
+
+    function renderEditableReceiptItems() {
+      const container = document.getElementById('editableReceiptItemsList');
+      let total = 0;
+
+      if (activeEditingOrder.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 text-center py-2">No items in receipt.</p>`;
+        document.getElementById('editableReceiptTotalAmount').innerText = '₱0.00';
+        return;
+      }
+
+      container.innerHTML = activeEditingOrder.map((item, idx) => {
+        let subtotal = item.price * item.qty;
+        total += subtotal;
+        return `
+          <div class="flex items-center justify-between text-xs bg-slate-50 p-2 rounded border border-slate-200">
+            <div class="flex-1">
+              <span class="font-bold text-slate-800">${item.name}</span>
+              <span class="text-[10px] text-slate-500 block">₱${item.price.toFixed(2)} x ${item.qty}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center border rounded bg-white">
+                <button onclick="updateModalItemQty(${idx}, -1)" class="px-1.5 py-0.5 hover:bg-slate-100 font-bold">-</button>
+                <span class="px-1.5">${item.qty}</span>
+                <button onclick="updateModalItemQty(${idx}, 1)" class="px-1.5 py-0.5 hover:bg-slate-100 font-bold">+</button>
+              </div>
+              <span class="font-bold w-16 text-right">₱${subtotal.toFixed(2)}</span>
+              <button onclick="removeModalItem(${idx})" class="text-rose-500 hover:text-rose-700 font-bold px-1.5">&times;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('editableReceiptTotalAmount').innerText = '₱' + total.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+      document.getElementById('qrcode').innerHTML = '';
+      new QRCode(document.getElementById('qrcode'), {
+        text: `Ref:${document.getElementById('editReceiptTxId').value}|Cust:${document.getElementById('editReceiptCustomer').value}|Total:${total.toFixed(2)}|User:${document.getElementById('receiptUserStamp').innerText}`,
+        width: 80,
+        height: 80
+      });
+    }
+
+    function updateModalItemQty(index, change) {
+      activeEditingOrder[index].qty += change;
+      if (activeEditingOrder[index].qty <= 0) {
+        activeEditingOrder.splice(index, 1);
+      }
+      renderEditableReceiptItems();
+    }
+
+    function removeModalItem(index) {
+      activeEditingOrder.splice(index, 1);
+      renderEditableReceiptItems();
+    }
+
+    function addItemToEditableReceipt() {
+      const selectId = document.getElementById('modalAddItemSelect').value;
+      const mItem = menuItems.find(i => i.id === selectId);
+      if (!mItem) return;
+
+      const existing = activeEditingOrder.find(i => i.id === selectId);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        activeEditingOrder.push({ id: mItem.id, name: mItem.name, price: mItem.price, qty: 1 });
+      }
+      renderEditableReceiptItems();
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receiptModal').classList.add('hidden');
+      editingLedgerTxId = null;
+    }
+
+    function triggerReceiptPrint(txData) {
+      const copies = printConfig.copies || 1;
+      for (let i = 0; i < copies; i++) {
+        setTimeout(() => {
+          let printWindow = window.open('', '_blank', 'width=400,height=600');
+          if (!printWindow) {
+            alert('Please allow popups for this app to print tickets.');
+            return;
+          }
+
+          let itemsHtml = (txData.items || []).map(item => `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>${item.qty}x ${item.name}</span>
+              <span>₱${(item.price * item.qty).toFixed(2)}</span>
+            </div>
+          `).join('');
+
+          let notesArr = txData.notes || [];
+          let notesHtml = '';
+          if (notesArr.some(n => n && n.trim() !== '')) {
+            notesHtml = `<div class="border-t" style="margin-top: 6px; padding-top: 4px; font-size: 10px;"><strong>Notes:</strong><br/>`;
+            notesArr.forEach(n => {
+              if (n && n.trim() !== '') {
+                notesHtml += `<div>- ${n}</div>`;
+              }
+            });
+            notesHtml += `</div>`;
+          }
+
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Print Receipt - ${txData.id}</title>
+              <style>
+                body { font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 72mm; margin: 0; padding: 10px; color: #000; background: #fff; }
+                .text-center { text-align: center; }
+                .border-b { border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; }
+                .border-t { border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; }
+                .flex { display: flex; justify-content: space-between; }
+                .bold { font-weight: bold; }
+              </style>
+            </head>
+            <body>
+              <div class="text-center border-b">
+                <div class="bold" style="font-size: 14px;">${printConfig.title}</div>
+                <div>Official Receipt / Ticket</div>
+                <div style="font-size: 10px; margin-top: 4px;">${txData.date}</div>
+                <div style="font-size: 10px; margin-top: 2px;">Served by: <strong>${txData.userStamp || 'Admin'}</strong></div>
+              </div>
+              <div style="margin-bottom: 6px; font-size: 11px;">
+                <div><strong>Ref ID:</strong> ${txData.id}</div>
+                <div><strong>Customer:</strong> ${txData.payee}</div>
+                <div><strong>Type:</strong> ${txData.type}</div>
+              </div>
+              <div class="border-b border-t">
+                <div class="flex bold" style="font-size: 10px; margin-bottom: 4px;">
+                  <span>ITEM</span>
+                  <span>AMT</span>
+                </div>
+                ${itemsHtml || '<div>' + txData.desc + '</div>'}
+              </div>
+              ${notesHtml}
+              <div class="flex bold" style="font-size: 14px; margin-top: 6px;">
+                <span>TOTAL:</span>
+                <span>₱${txData.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+              </div>
+              <div class="text-center border-t" style="margin-top: 10px; font-size: 10px;">
+                <div>Thank you for your business with Ullswater Corporation!</div>
+              </div>
+            </body>
+            </html>
+          `);
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+          }, 300);
+        }, i * 600);
+      }
+    }
+
+    function confirmAndPrintOrder() {
+      for(let i=1; i<=5; i++) {
+        document.getElementById(`mainNote${i}`).value = document.getElementById(`ticketNote${i}`).value;
+      }
+
+      if (activeEditingOrder.length === 0) {
+        alert('Cannot process empty ticket.');
+        return;
+      }
+
+      let totalAmount = 0;
+      let descSummary = activeEditingOrder.map(i => `${i.qty}x ${i.name}`).join(', ');
+      const txType = document.getElementById('editReceiptType').value;
+      const txId = document.getElementById('editReceiptTxId').value;
+      const customer = document.getElementById('editReceiptCustomer').value || 'Walk-in Customer';
+      const userStamp = document.getElementById('receiptUserStamp').innerText;
+      
+      const notes = [
+        document.getElementById('ticketNote1').value.trim(),
+        document.getElementById('ticketNote2').value.trim(),
+        document.getElementById('ticketNote3').value.trim(),
+        document.getElementById('ticketNote4').value.trim(),
+        document.getElementById('ticketNote5').value.trim()
+      ];
+
+      const date = document.getElementById('orderDate').value;
+
+      if (editingLedgerTxId) {
+        const oldTx = ledger.find(i => i.id === editingLedgerTxId);
+        if (oldTx && oldTx.items) {
+          oldTx.items.forEach(ci => {
+            let mItem = menuItems.find(m => m.id === ci.id);
+            if (mItem) {
+              if (oldTx.type === 'Income') mItem.stock += ci.qty;
+              else mItem.stock -= ci.qty;
+            }
+          });
+        }
+        ledger = ledger.filter(i => i.id !== editingLedgerTxId);
+      }
+
+      for (let cartItem of activeEditingOrder) {
+        let mItem = menuItems.find(m => m.id === cartItem.id);
+        if (!mItem) {
+          alert(`Item ${cartItem.name} no longer exists in inventory!`);
+          return;
+        }
+        if (txType === 'Income') {
+          if (mItem.stock < cartItem.qty) {
+            alert(`Insufficient stock for ${cartItem.name}! Available: ${mItem.stock}`);
+            return;
+          }
+          mItem.stock -= cartItem.qty;
+        } else {
+          mItem.stock += cartItem.qty;
+        }
+        totalAmount += cartItem.price * cartItem.qty;
+      }
+
+      const newTx = {
+        id: txId,
+        date: date,
+        desc: descSummary,
+        payee: customer,
+        userStamp: userStamp,
+        type: txType,
+        amount: totalAmount,
+        notes: notes,
+        items: [...activeEditingOrder]
+      };
+
+      ledger.unshift(newTx);
+      saveAndRefresh();
+
+      currentOrder = [];
+      clearCurrentOrder();
+      renderTicketCart();
+      closeReceiptModal();
+
+      triggerReceiptPrint(newTx);
+    }
+
+    function editLedgerEntry(id) {
+      const tx = ledger.find(i => i.id === id);
+      if (tx) {
+        if (!tx.items || tx.items.length === 0) {
+          tx.items = [{ id: 'M-GEN', name: tx.desc, price: tx.amount, qty: 1 }];
+        }
+        openEditableReceiptModal(tx);
+      }
+    }
+
+    function deleteLedgerEntry(id) {
+      const tx = ledger.find(i => i.id === id);
+      if (tx && tx.items) {
+        tx.items.forEach(ci => {
+          let mItem = menuItems.find(m => m.id === ci.id);
+          if (mItem) {
+            if (tx.type === 'Income') mItem.stock += ci.qty;
+            else mItem.stock -= ci.qty;
+          }
+        });
+      }
+      ledger = ledger.filter(i => i.id !== id);
+      saveAndRefresh();
+    }
+
+    function saveAndRefresh() {
+      localStorage.setItem('ullswater_menu_items', JSON.stringify(menuItems));
+      localStorage.setItem('ullswater_ledger', JSON.stringify(ledger));
+      initApp();
+    }
+
+    function renderInventoryTable() {
+      const tbody = document.getElementById('inventoryTableBody');
+      tbody.innerHTML = menuItems.map((item, idx) => `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="p-3"><img src="${item.image || 'https://via.placeholder.com/150'}" class="w-10 h-10 object-cover rounded-lg border"></td>
+          <td class="p-3 font-semibold text-slate-800">${item.name}</td>
+          <td class="p-3"><span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">${item.category}</span></td>
+          <td class="p-3 text-right font-medium">₱${item.price.toFixed(2)}</td>
+          <td class="p-3 text-center font-bold text-slate-700">${item.stock}</td>
+          <td class="p-3 text-center">
+            <button onclick="editInventoryItem(${idx}); openInventoryModal();" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs font-medium mr-1">Edit</button>
+            <button onclick="deleteInventoryItem(${idx})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-xs font-medium">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderLedger() {
+      const tbody = document.getElementById('ledgerTableBody');
+      tbody.innerHTML = '';
+      let totalExp = 0, totalInc = 0;
+
+      ledger.forEach(item => {
+        if (item.type === 'Income') totalInc += item.amount;
+        else totalExp += item.amount;
+
+        let notesList = (item.notes || []).filter(n => n && n.trim() !== '').map(n => `<span class="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 mr-1 inline-block">• ${n}</span>`).join('');
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+        tr.innerHTML = `
+          <td class="p-3 whitespace-nowrap">${item.date}</td>
+          <td class="p-3 font-mono text-xs text-slate-500">${item.id}</td>
+          <td class="p-3 font-medium text-slate-800">
+            ${item.desc}
+            ${notesList ? '<div class="mt-1">' + notesList + '</div>' : ''}
+          </td>
+          <td class="p-3">${item.payee}</td>
+          <td class="p-3"><span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-semibold">${item.userStamp || 'Admin'}</span></td>
+          <td class="p-3 text-center"><span class="px-2 py-0.5 rounded text-xs ${item.type === 'Income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}">${item.type}</span></td>
+          <td class="p-3 text-right font-semibold ${item.type === 'Income' ? 'text-emerald-600' : 'text-rose-600'}">
+            ${item.type === 'Income' ? '+' : '-'}${item.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+          </td>
+          <td class="p-3 text-center space-x-1">
+            <button onclick="editLedgerEntry('${item.id}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded text-xs font-medium">Edit / Print</button>
+            <button onclick="deleteLedgerEntry('${item.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded text-xs font-medium">Void</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('totalIncomeDisplay').innerText = totalInc.toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('totalExpenseDisplay').innerText = totalExp.toLocaleString('en-US', {minimumFractionDigits: 2});
+      document.getElementById('netBalanceDisplay').innerText = (totalInc - totalExp).toLocaleString('en-US', {minimumFractionDigits: 2});
+    }
+  </script>
+</body>
+</html>
